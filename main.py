@@ -26,6 +26,7 @@ def main():
 Examples:
   uv-disk-clean                    # Run interactive menu
   uv-disk-clean --base-path ~/projects  # Use custom base path
+  uv-disk-clean --history          # Show cleanup history and exit
   uv-disk-clean --help              # Show this help message
         """
     )
@@ -43,12 +44,24 @@ Examples:
         version='%(prog)s 1.0.0'
     )
     
+    parser.add_argument(
+        '--history',
+        action='store_true',
+        help='Show cleanup operation history and exit'
+    )
+    
     args = parser.parse_args()
     
     base_path = Path(args.base_path).expanduser() if args.base_path else None
     
     try:
         menu = Menu(base_path)
+        
+        # If --history flag is provided, show history and exit
+        if args.history:
+            menu.show_history()
+            sys.exit(0)
+        
         menu.run()
     except KeyboardInterrupt:
         print("\n\nExiting...")

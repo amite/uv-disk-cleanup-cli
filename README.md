@@ -10,6 +10,7 @@ A comprehensive CLI tool for monitoring and cleaning up disk space used by uv Py
 - **Virtual Environment Management**: Identify and remove unused virtual environments
 - **Space Monitoring**: Track disk space changes when running `uv` commands
 - **Cleanup Recommendations**: Get suggestions for freeing up space
+- **Cleanup History**: View history of all cleanup operations with detailed statistics
 
 ## Installation
 
@@ -57,7 +58,8 @@ This will launch an interactive menu with the following options:
 4. **Remove specific virtual environment** - Manually select a venv to remove
 5. **Show cleanup recommendations** - Get suggestions for freeing space
 6. **Monitor space (run uv command)** - Track space usage for uv commands
-7. **Exit** - Quit the tool
+7. **View cleanup history** - View history of all cleanup operations
+8. **Exit** - Quit the tool
 
 ### Command Line Options
 
@@ -67,14 +69,123 @@ uv-disk-clean [OPTIONS]
 Options:
   --base-path PATH    Base path to search for virtual environments
                       (default: ~/code/python)
+  --history           Show cleanup operation history and exit
   --version           Show version information
   --help              Show help message
 ```
 
-Example:
+Examples:
 ```bash
 uv-disk-clean --base-path ~/projects
+uv-disk-clean --history
 ```
+
+## Interface Preview
+
+The tool features a modern, color-coded interface powered by the Rich library. Here's what you can expect:
+
+### Main Menu
+
+When you run `uv-disk-clean`, you'll see a header with current usage statistics and an interactive menu:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│              UV Disk Space Manager                      │
+├─────────────────────────────────────────────────────────┤
+│ Current Usage:    33.34 GB                              │
+│ Cache:            15.42 GB                              │
+│ Virtual Envs:     17.92 GB (12 environments)            │
+└─────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│                        Options                          │
+├─────────────────────────────────────────────────────────┤
+│ 1   Show detailed analysis                              │
+│ 2   Clean UV cache                                      │
+│ 3   Remove unused virtual environments                  │
+│ 4   Remove specific virtual environment                 │
+│ 5   Show cleanup recommendations                        │
+│ 6   Monitor space (run uv command)                      │
+│ 7   View cleanup history                                │
+│ 8   Exit                                                │
+└─────────────────────────────────────────────────────────┘
+
+Select option [8]:
+```
+
+### Cleanup History View
+
+When viewing history with `--history` or option 7, you'll see a formatted table:
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                          Cleanup History                                   │
+├──────────────┬──────────┬──────────────┬───────────────────────────────────┤
+│ Date/Time    │ Type     │ Space Freed  │ Details                           │
+├──────────────┼──────────┼──────────────┼───────────────────────────────────┤
+│ 2024-12-15   │ Cache    │ 12.45 GB     │ 88,974 files                      │
+│ 14:32:10     │          │              │                                   │
+├──────────────┼──────────┼──────────────┼───────────────────────────────────┤
+│ 2024-12-14   │ Venv     │ 1.23 GB      │ ~/code/python/project1/.venv      │
+│ 10:15:22     │          │              │                                   │
+├──────────────┼──────────┼──────────────┼───────────────────────────────────┤
+│ 2024-12-13   │ Cache    │ 8.92 GB      │ 65,432 files                      │
+│ 09:45:33     │          │              │                                   │
+└──────────────┴──────────┴──────────────┴───────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│                        Summary                          |
+├─────────────────────────────────────────────────────────┤
+│ Total Operations:    3                                  │
+│ Cache Cleanups:      2                                  │
+│ Venv Removals:        1                                 │
+│ Total Space Freed:    22.60 GB                          │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Detailed Analysis View
+
+The detailed analysis shows comprehensive breakdowns with color-coded tables:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    UV Cache Analysis                    │
+├─────────────────────────────────────────────────────────┤
+│ Component              │ Size                           │
+├────────────────────────┼────────────────────────────────┤
+│ Total Cache            │ 15.42 GB                       │
+│ Location               │ ~/.cache/uv                    │
+├────────────────────────┼────────────────────────────────┤
+│ archive-v0             │ 12.34 GB                       │
+│ wheel-v0                │ 2.85 GB                       │
+│ git-v0                  │ 0.23 GB                       │
+└────────────────────────┴────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────┐
+│              Virtual Environment Analysis               │
+├─────────────────────────────────────────────────────────┤
+│ Virtual Environment    │ Size                           │
+├────────────────────────┼────────────────────────────────┤
+│ Total                  │ 17.92 GB                       │
+│ Found 12 virtual environment(s)                         │
+├────────────────────────┼────────────────────────────────┤
+│ project1/.venv         │ 4.26 GB                        │
+│ project2/.venv         │ 3.15 GB                        │
+│ project3/.venv         │ 2.89 GB                        │
+│ ...                    │ ...                            │
+└────────────────────────┴────────────────────────────────┘
+```
+
+### Color Coding
+
+The interface uses color coding for better readability:
+- **Cyan**: Headers, labels, and section titles
+- **Green**: Success messages, cache operations, and positive values
+- **Yellow**: Warnings, venv operations, and cautionary information
+- **Red**: Errors and exit options
+- **Dim**: Secondary information and placeholders
+
+All tables, panels, and progress indicators are styled with Rich for a professional, modern appearance.
 
 ## How It Works
 
@@ -111,6 +222,10 @@ The tool creates log files in your home directory:
 - `~/.uv_space_log.json` - History of space monitoring operations
 - `~/.uv_disk_cleanup_log.json` - History of cleanup operations
 
+You can view the cleanup history using:
+- The `--history` flag: `uv-disk-clean --history`
+- Option 7 in the interactive menu
+
 ## Examples
 
 ### Clean up cache
@@ -130,6 +245,17 @@ uv-disk-clean
 ```bash
 uv-disk-clean
 # Select option 3: Remove unused virtual environments
+```
+
+### View cleanup history
+```bash
+uv-disk-clean --history
+```
+
+Or from the interactive menu:
+```bash
+uv-disk-clean
+# Select option 7: View cleanup history
 ```
 
 ## Project Structure

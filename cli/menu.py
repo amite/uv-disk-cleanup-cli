@@ -1,7 +1,9 @@
 """Interactive menu system for the CLI tool."""
 
 import sys
+import json
 from pathlib import Path
+from datetime import datetime
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -64,7 +66,8 @@ class Menu:
         menu_table.add_row("4", "Remove specific virtual environment")
         menu_table.add_row("5", "Show cleanup recommendations")
         menu_table.add_row("6", "Monitor space (run uv command)")
-        menu_table.add_row("7", "[red]Exit[/red]")
+        menu_table.add_row("7", "View cleanup history")
+        menu_table.add_row("8", "[red]Exit[/red]")
         
         menu_panel = Panel(
             menu_table,
@@ -463,6 +466,139 @@ class Menu:
         
         Prompt.ask("\n[dim]Press Enter to continue...[/dim]", default="")
     
+    def show_history(self):
+        """Show cleanup operation history."""
+        log_file = Path.home() / '.uv_disk_cleanup_log.json'
+        
+        self.console.print()
+        
+        # Check if log file exists
+        if not log_file.exists():
+            self.console.print(Panel(
+                "[yellow]No cleanup history found.[/yellow]\n[dim]History will be created when you perform cleanup operations.[/dim]",
+                title="[bold cyan]Cleanup History[/bold cyan]",
+                border_style="cyan"
+            ))
+            return
+        
+        # Load log data
+        try:
+            with open(log_file, 'r') as f:
+                log_data = json.load(f)
+        except json.JSONDecodeError:
+            self.console.print(Panel(
+                "[red]Error:[/red] Could not parse cleanup log file. It may be corrupted.",
+                title="[bold red]Error[/bold red]",
+                border_style="red"
+            ))
+            return
+        except Exception as e:
+            self.console.print(Panel(
+                f"[red]Error:[/red] Could not read cleanup log file: {e}",
+                title="[bold red]Error[/bold red]",
+                border_style="red"
+            ))
+            return
+        
+        # Check if log is empty
+        if not log_data:
+            self.console.print(Panel(
+                "[yellow]No cleanup history found.[/yellow]\n[dim]History will be created when you perform cleanup operations.[/dim]",
+                title="[bold cyan]Cleanup History[/bold cyan]",
+                border_style="cyan"
+            ))
+            return
+        
+        # Sort by timestamp (newest first)
+        log_data.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+        
+        # Create history table
+        history_table = Table(title="[bold cyan]Cleanup History[/bold cyan]", box=box.ROUNDED)
+        history_table.add_column("Date/Time", style="cyan")
+        history_table.add_column("Type", style="yellow")
+        history_table.add_column("Space Freed", justify="right", style="green")
+        history_table.add_column("Details", style="dim", overflow="fold")
+        
+        total_freed = 0
+        cache_count = 0
+        venv_count = 0
+        
+        for entry in log_data:
+            # Parse timestamp
+            try:
+                timestamp = datetime.fromisoformat(entry.get('timestamp', ''))
+                time_str = timestamp.strftime('%Y-%m-%d %H:%M:%S')
+            except (ValueError, TypeError):
+                time_str = entry.get('timestamp', 'Unknown')
+            
+            # Get type and format
+            cleanup_type = entry.get('type', 'unknown')
+            if cleanup_type == 'cache':
+                type_str = "[green]Cache[/green]"
+                cache_count += 1
+            elif cleanup_type == 'venv':
+                type_str = "[yellow]Venv[/yellow]"
+                venv_count += 1
+            else:
+                type_str = f"[dim]{cleanup_type}[/dim]"
+            
+            # Get size freed
+            size_freed = entry.get('size_freed', 0)
+            total_freed += size_freed
+            size_str = format_size(size_freed)
+            
+            # Build details string
+            details_parts = []
+            
+            if cleanup_type == 'cache':
+                files_removed = entry.get('files_removed', 0)
+                if files_removed > 0:
+                    details_parts.append(f"{files_removed:,} files")
+            elif cleanup_type == 'venv':
+                path = entry.get('path')
+                if path:
+                    # Try to make path relative and shorter
+                    try:
+                        path_obj = Path(path)
+                        if path_obj.is_absolute():
+                            # Try to make it relative to home or base path
+                            try:
+                                rel_path = path_obj.relative_to(Path.home())
+                                details_parts.append(f"~/{rel_path}")
+                            except ValueError:
+                                try:
+                                    if self.base_path:
+                                        rel_path = path_obj.relative_to(self.base_path.parent)
+                                        details_parts.append(str(rel_path))
+                                    else:
+                                        details_parts.append(path)
+                                except ValueError:
+                                    details_parts.append(path)
+                        else:
+                            details_parts.append(path)
+                    except:
+                        details_parts.append(path)
+            
+            details_str = " | ".join(details_parts) if details_parts else "[dim]—[/dim]"
+            
+            history_table.add_row(time_str, type_str, size_str, details_str)
+        
+        # Display table
+        self.console.print(Panel(history_table, border_style="cyan"))
+        
+        # Display summary
+        summary_table = Table.grid(padding=(0, 2))
+        summary_table.add_column(style="cyan", justify="right")
+        summary_table.add_column(style="green")
+        
+        summary_table.add_row("Total Operations:", f"[bold]{len(log_data)}[/bold]")
+        summary_table.add_row("Cache Cleanups:", f"[green]{cache_count}[/green]")
+        summary_table.add_row("Venv Removals:", f"[yellow]{venv_count}[/yellow]")
+        summary_table.add_row("Total Space Freed:", f"[bold green]{format_size(total_freed)}[/bold green]")
+        
+        self.console.print()
+        self.console.print(Panel(summary_table, title="[bold cyan]Summary[/bold cyan]", border_style="cyan"))
+    
     def run(self):
         """Run the interactive menu loop."""
         while self.running:
@@ -470,7 +606,7 @@ class Menu:
                 self.display_header()
                 self.display_menu()
                 
-                choice = Prompt.ask("Select option", default="7").strip()
+                choice = Prompt.ask("Select option", default="8").strip()
                 
                 if choice == '1':
                     self.show_detailed_analysis()
@@ -485,10 +621,13 @@ class Menu:
                 elif choice == '6':
                     self.monitor_command()
                 elif choice == '7':
+                    self.show_history()
+                    Prompt.ask("\n[dim]Press Enter to continue...[/dim]", default="")
+                elif choice == '8':
                     self.console.print("\n[dim]Exiting...[/dim]")
                     self.running = False
                 else:
-                    self.console.print("\n[red]Invalid option. Please select 1-7.[/red]")
+                    self.console.print("\n[red]Invalid option. Please select 1-8.[/red]")
                     Prompt.ask("[dim]Press Enter to continue...[/dim]", default="")
             except KeyboardInterrupt:
                 self.console.print("\n\n[dim]Exiting...[/dim]")
