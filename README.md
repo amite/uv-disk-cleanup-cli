@@ -18,18 +18,23 @@ A comprehensive CLI tool for monitoring and cleaning up disk space used by uv Py
    cd ~/code/python/uv-disk-manager
    ```
 
-2. Run the installation script:
+2. Install dependencies using uv:
+   ```bash
+   uv sync
+   ```
+
+3. Run the installation script:
    ```bash
    ./install.sh
    ```
 
-3. If `~/.local/bin` is not in your PATH, add it to your `~/.bashrc` or `~/.zshrc`:
+4. If `~/.local/bin` is not in your PATH, add it to your `~/.bashrc` or `~/.zshrc`:
    ```bash
    export PATH="$HOME/.local/bin:$PATH"
    source ~/.bashrc  # or source ~/.zshrc
    ```
 
-4. Verify installation:
+5. Verify installation:
    ```bash
    uv-disk-clean --version
    ```
@@ -148,6 +153,7 @@ uv-disk-manager/
 - `uv` command available in PATH
 - `du` command (standard on Linux/WSL)
 - Standard Linux utilities (`find`, `stat`, `git`)
+- Dependencies are managed via `pyproject.toml` (run `uv sync` to install)
 
 ## Notes
 

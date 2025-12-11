@@ -5,6 +5,10 @@ import sys
 import json
 from pathlib import Path
 from datetime import datetime
+from rich.console import Console
+from rich.panel import Panel
+from rich.table import Table
+from rich import box
 from core.utils import get_dir_size, format_size
 
 
@@ -102,85 +106,115 @@ class SpaceMonitor:
         
         return sorted(packages)
     
-    def monitor_command(self, command_args):
+    def monitor_command(self, command_args, console=None):
         """Monitor a uv command and report space changes.
         
         Args:
             command_args: List of command arguments (e.g., ['uv', 'add', 'pandas'])
+            console: Optional Rich Console instance for formatted output
         """
-        print("=" * 80)
-        print("UV Space Monitor")
-        print("=" * 80)
-        print(f"Working directory: {self.base_path}")
-        print(f"Command: {' '.join(command_args)}")
-        print()
+        if console is None:
+            console = Console()
+        
+        info_table = Table.grid(padding=(0, 2))
+        info_table.add_column(style="cyan")
+        info_table.add_column(style="green")
+        info_table.add_row("Working directory:", str(self.base_path))
+        info_table.add_row("Command:", ' '.join(command_args))
+        
+        console.print()
+        console.print(Panel(info_table, title="[bold cyan]UV Space Monitor[/bold cyan]", border_style="cyan"))
+        console.print()
         
         # Get usage before
-        print("Measuring disk usage BEFORE command...")
+        console.print("[cyan]Measuring disk usage BEFORE command...[/cyan]")
         before = self.get_current_usage()
         packages_before = self.get_package_list(before['venv_path'])
         
-        print(f"  Cache size:     {format_size(before['cache_size']):>15s}")
-        print(f"  .venv size:     {format_size(before['venv_size']):>15s}")
-        print(f"  Total:          {format_size(before['total_size']):>15s}")
-        print(f"  Packages:       {len(packages_before):>15d}")
-        print()
+        before_table = Table.grid(padding=(0, 2))
+        before_table.add_column(style="cyan")
+        before_table.add_column(style="green", justify="right")
+        before_table.add_row("Cache size:", format_size(before['cache_size']))
+        before_table.add_row(".venv size:", format_size(before['venv_size']))
+        before_table.add_row("Total:", f"[bold]{format_size(before['total_size'])}[/bold]")
+        before_table.add_row("Packages:", str(len(packages_before)))
+        
+        console.print(before_table)
+        console.print()
         
         # Run the command
-        print("Running command...")
-        print("-" * 80)
+        console.print("[yellow]Running command...[/yellow]")
+        console.print("-" * 80)
         try:
             result = subprocess.run(
                 command_args,
                 check=False,
                 capture_output=False
             )
-            print("-" * 80)
-            print()
+            console.print("-" * 80)
+            console.print()
             
             if result.returncode != 0:
-                print(f"Warning: Command exited with code {result.returncode}")
-                print()
+                console.print(f"[yellow]Warning: Command exited with code {result.returncode}[/yellow]")
+                console.print()
         except KeyboardInterrupt:
-            print("\nCommand interrupted by user")
+            console.print("\n[yellow]Command interrupted by user[/yellow]")
             return
         except Exception as e:
-            print(f"Error running command: {e}")
+            console.print(f"[bold red]Error running command:[/bold red] {e}")
             return
         
         # Get usage after
-        print("Measuring disk usage AFTER command...")
+        console.print("[cyan]Measuring disk usage AFTER command...[/cyan]")
         after = self.get_current_usage()
         packages_after = self.get_package_list(after['venv_path'])
         
-        print(f"  Cache size:     {format_size(after['cache_size']):>15s}")
-        print(f"  .venv size:     {format_size(after['venv_size']):>15s}")
-        print(f"  Total:          {format_size(after['total_size']):>15s}")
-        print(f"  Packages:       {len(packages_after):>15d}")
-        print()
+        after_table = Table.grid(padding=(0, 2))
+        after_table.add_column(style="cyan")
+        after_table.add_column(style="green", justify="right")
+        after_table.add_row("Cache size:", format_size(after['cache_size']))
+        after_table.add_row(".venv size:", format_size(after['venv_size']))
+        after_table.add_row("Total:", f"[bold]{format_size(after['total_size'])}[/bold]")
+        after_table.add_row("Packages:", str(len(packages_after)))
+        
+        console.print(after_table)
+        console.print()
         
         # Calculate differences
-        print("Changes")
-        print("-" * 80)
         cache_diff = after['cache_size'] - before['cache_size']
         venv_diff = after['venv_size'] - before['venv_size']
         total_diff = after['total_size'] - before['total_size']
         packages_diff = len(packages_after) - len(packages_before)
         
-        print(f"  Cache change:   {format_size(cache_diff):>15s} ({'+' if cache_diff >= 0 else ''}{cache_diff:,} bytes)")
-        print(f"  .venv change:   {format_size(venv_diff):>15s} ({'+' if venv_diff >= 0 else ''}{venv_diff:,} bytes)")
-        print(f"  Total change:   {format_size(total_diff):>15s} ({'+' if total_diff >= 0 else ''}{total_diff:,} bytes)")
-        print(f"  Packages added: {packages_diff:>15d}")
-        print()
+        changes_table = Table(title="[bold yellow]Changes[/bold yellow]", box=box.ROUNDED)
+        changes_table.add_column("Metric", style="cyan")
+        changes_table.add_column("Change", justify="right", style="green")
+        changes_table.add_column("Bytes", justify="right", style="dim")
+        
+        def format_diff(value):
+            sign = "+" if value >= 0 else ""
+            color = "green" if value >= 0 else "red"
+            return f"[{color}]{sign}{format_size(value)}[/{color}]"
+        
+        changes_table.add_row("Cache change", format_diff(cache_diff), f"{cache_diff:+,}")
+        changes_table.add_row(".venv change", format_diff(venv_diff), f"{venv_diff:+,}")
+        changes_table.add_row("Total change", format_diff(total_diff), f"{total_diff:+,}")
+        changes_table.add_row("Packages added", f"[green]{packages_diff:+d}[/green]", "")
+        
+        console.print(Panel(changes_table, border_style="yellow"))
         
         # Show new packages
+        new_packages = set()
         if packages_diff > 0:
             new_packages = set(packages_after) - set(packages_before)
             if new_packages:
-                print("New packages installed:")
-                for pkg in sorted(new_packages):
-                    print(f"  • {pkg}")
-                print()
+                console.print()
+                pkg_list = "\n".join(f"  • {pkg}" for pkg in sorted(new_packages))
+                console.print(Panel(
+                    pkg_list,
+                    title="[bold green]New packages installed[/bold green]",
+                    border_style="green"
+                ))
         
         # Save to log
         log_entry = {
@@ -204,7 +238,9 @@ class SpaceMonitor:
         log_data = log_data[-100:]
         self.save_log(log_data)
         
-        print("=" * 80)
-        print(f"Monitoring complete. Log saved to: {self.log_file}")
-        print("=" * 80)
+        console.print()
+        console.print(Panel(
+            f"[dim]Monitoring complete. Log saved to:[/dim] {self.log_file}",
+            border_style="cyan"
+        ))
 

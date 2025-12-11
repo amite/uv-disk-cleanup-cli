@@ -2,10 +2,12 @@
 
 ## Installation
 
-```bash
-cd ~/code/python/uv-disk-manager
-./install.sh
-```
+1. Install dependencies and the tool:
+   ```bash
+   cd ~/code/python/uv-disk-manager
+   uv sync
+   ./install.sh
+   ```
 
 ## Basic Usage
 

@@ -1,7 +1,7 @@
 [project]
 name = "uv-disk-manager"
 version = "0.1.0"
-description = "Add your description here"
+description = "CLI tool for monitoring and cleaning up disk space used by uv Python packages"
 readme = "README.md"
-requires-python = ">=3.12"
-dependencies = []
+requires-python = ">=3.8"
+dependencies = ["rich>=13.0.0"]
